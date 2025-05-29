@@ -1,0 +1,191 @@
+---
+title: "Session1:"
+author: "Henry W. Santillan Culquimboz"
+date: "May 27, 2025"
+format:
+  html:
+    toc: true
+    toc-location: left
+    number-sections: true
+    embed-resources: true
+    output-file: index
+output-dir: "../"
+---
+
+```{r}
+# ====================================
+# 1. INSTALACIÓN DE PAQUETES
+# ====================================
+
+# Instalar paquetes necesarios (ejecutar solo una vez)
+#install.packages(c("tidyverse", "ggplot2", "skimr", "corrplot", "car", "agricolae", 
+                   #"lattice", "DescTools", "summarytools", "moments", "inti"))
+```
+
+```{r}
+# ====================================
+# 2. CARGA DE LIBRERÍAS
+# ====================================
+# Librerías principales
+library(tidyverse)      # Manipulación y análisis de datos (incluye dplyr, ggplot2, etc.)
+library(dplyr)          # Manipulación de datos (carga explícita para asegurar disponibilidad)
+library(readxl)         # Lectura de archivos Excel
+library(googlesheets4)  # Acceso a Google Sheets
+
+# Librerías de visualización
+library(ggplot2)        # Visualización avanzada
+library(lattice)        # Gráficos multivariados
+library(corrplot)       # Matrices de correlación
+library(naniar)         # Visualización de valores faltantes
+
+# Librerías de análisis estadístico
+library(skimr)          # Resumen exploratorio de datos
+library(car)            # Análisis de regresión y diagnósticos
+library(agricolae)      # Análisis estadísticos agrícolas
+library(moments)        # Estadísticas de forma (asimetría, curtosis)
+library(DescTools)      # Herramientas estadísticas descriptivas
+library(summarytools)   # Resúmenes tabulares
+
+# Librerías adicionales
+library(inti)           # Herramientas complementarias
+
+```
+
+```{r}
+# ====================================
+# 3. IMPORTACIÓN DE DATOS
+# ====================================
+# Verificar escritorio
+getwd()
+list.files()  # Muestra los archivos en el directorio actual
+
+# --------------------------------------------
+# 3.1 Importar desde archivo CSV
+# --------------------------------------------
+csvdat <- read.csv(file = "F:/Estadistica Para Ingenieros/Datos/datos_cultivo.csv",
+                   header = TRUE,
+                   stringsAsFactors = FALSE)
+
+# --------------------------------------------
+# 3.2 Importar desde archivo TSV
+# --------------------------------------------
+tsvdat <- read.delim(file = "F:/Estadistica Para Ingenieros/Datos/datos_cultivo.tsv", 
+                     sep = "\t", 
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# --------------------------------------------
+# 3.3 Importar desde archivo Excel
+# --------------------------------------------
+xlsdat <- read_xlsx(path = "F:/Estadistica Para Ingenieros/Datos/datos_cultivo.xlsx", 
+                    sheet = 1)
+
+# --------------------------------------------
+# 3.4 Importar desde Google Sheets
+# --------------------------------------------
+# URL del archivo de Google Sheets
+url <- "https://docs.google.com/spreadsheets/d/1UH43v7VRXYds-mY6kIPwRYcftQ8rjoYf192HJgFLPgk/edit?gid=0#gid=0"
+
+# Convertir URL a ID de Google Sheets
+gs_id <- as_sheets_id(url)
+
+# Leer datos de la primera hoja
+basedata <- range_read(ss = gs_id, 
+                       sheet = 1,
+                       col_names = TRUE)
+```
+
+```{r}
+# ====================================
+# 5. SELECCIÓN DEL DATASET PRINCIPAL
+# ====================================
+
+# Seleccionar el dataset principal para el análisis
+datos_cultivo <- basedata  # Usando Google Sheets como fuente principal
+
+# Verificar el dataset seleccionado
+datos_cultivo
+
+```
+
+```{r}
+# ====================================
+# 6. EXPLORACIÓN INICIAL DE DATOS
+# ====================================
+# --------------------------------------------
+# 6.1 Estructura y dimensiones
+# --------------------------------------------
+# Verificar el dataset seleccionado
+glimpse(datos_cultivo)
+
+# Ver estructura detallada
+str(datos_cultivo)
+
+# Dimensiones del dataset
+print(paste("Dimensiones:", nrow(datos_cultivo), "filas y", ncol(datos_cultivo), "columnas"))
+
+# Nombres de las variables
+names(datos_cultivo)
+
+```
+
+```{r}
+# ====================================
+# 8. ESTADÍSTICAS DESCRIPTIVAS GENERALES
+# ====================================
+
+print("RESUMEN ESTADÍSTICO BÁSICO:")
+summary(datos_cultivo)
+
+print("RESUMEN EXTENDIDO CON SKIM:")
+skim(datos_cultivo)
+```
+
+```{r}
+# ====================================
+# 9. ESTADÍSTICAS DESCRIPTIVAS POR GRUPOS
+# ====================================
+# -------------------------
+# 9.1 Análisis por variedad 
+# -------------------------
+# Medidas de tendencia central y dispersión por variedad
+stats_variedad <- aggregate(rendimiento ~ variedad, data = datos_cultivo, 
+          FUN = function(x) c(media = mean(x), mediana = median(x), 
+                              sd = sd(x), CV = sd(x)/mean(x)*100,
+                              min = min(x), max = max(x), 
+                              IQR = IQR(x)))
+
+print(stats_variedad)
+    
+
+# --------------------------------------------
+# 9.2 Análisis por tratamiento de fertilizante
+# --------------------------------------------
+# Estadísticas por niveles del factor fertilizante
+stats_fertilizante <- by(datos_cultivo$rendimiento, datos_cultivo$fertilizante, summary)
+print(stats_fertilizante)
+```
+
+```{r}
+# # ====================================
+# 10. Graficos 
+# ====================================
+# Histograma con curva de densidad para rendimiento
+ggplot(datos_cultivo, aes(x = rendimiento)) +
+  geom_histogram(aes(y = ..density..), bins = 15, fill = "skyblue", color = "black") +
+  geom_density(alpha = 0.5, color = "red") +
+  geom_vline(aes(xintercept = mean(rendimiento, na.rm = TRUE)), 
+             color = "blue", linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = median(rendimiento, na.rm = TRUE)), 
+             color = "darkgreen", linetype = "dashed", siz = 1) +
+  ggtitle("Distribución del Rendimiento") +
+  theme_classic()
+
+# Q-Q plot para evaluar normalidad del rendimiento
+qqPlot(datos_cultivo$rendimiento, 
+       main = "Q-Q Plot para Rendimiento", 
+       xlab = "Cuantiles teóricos", 
+       ylab = "Cuantiles observados")
+
+```
+

@@ -1,0 +1,124 @@
+---
+title: "Kruskal-Wallis"
+author: "Henry W. Santillan Culquimboz"
+format: 
+  html:
+    toc: true
+    toc-location: left
+    number-sections: true
+    embed-resources: true
+    output-file: index
+output-dir: "../"
+---
+
+```{r}
+# ====================================
+# 1. CARGA DE LIBRERÍAS
+# ====================================
+# Manipulación de datos
+library(dplyr)
+
+# Importación de archivos Excel
+library(openxlsx)
+
+# Análisis no paramétrico y post-hoc
+library(FSA)           # dunnTest
+library(PMCMRplus)     # kwAllPairsDunnTest, PMCMRTable
+library(rcompanion)    # cldList
+
+# Gráficos
+library(ggplot2)
+
+```
+
+```{r}
+# ====================================
+# 2. IMPORTACIÓN Y EXPLORACIÓN DE DATOS
+# ====================================
+getwd() # Verificar escritorio
+
+# Importar desde archivo Excel
+DatAov1 <- read.xlsx("F:/Estadistica Para Ingenieros/Datos/EjerciciosANOVA.xlsx",
+                     sheet = "Kruskal-Wallis")
+
+# Ver estructura detallada
+str(DatAov1)
+```
+
+```{r}
+# ====================================
+# 3. PREPARACIÓN Y AJUSTE DEL MODELO
+# ====================================
+# Convertir variables categóricas a factor
+DatAov1 <- DatAov1 |> 
+  mutate(ID = factor(ID),
+         Dosis = factor(Dosis))
+
+# Ver estructura
+str(DatAov1)
+
+# Verificar normalidad por grupo
+print(by(DatAov1$Longitud_Raiz, DatAov1$Dosis, shapiro.test))
+
+# Verificar homogeneidad de varianzas
+bartlett.test(Longitud_Raiz ~ Dosis, data = DatAov1)
+```
+
+```{r}
+# ====================================
+# 4. ANÁLISIS GRÁFICO
+# ====================================
+ggplot(DatAov1, aes(x = Dosis, y = Longitud_Raiz)) +
+  geom_boxplot(fill = "lightblue") +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Longitud de raíz según dosis de fitohormona",
+       x = "Dosis de fitohormona",
+       y = "Longitud de raíz")
+
+# Gráfico adicional con boxplot base
+boxplot(Longitud_Raiz ~ Dosis, 
+        data = DatAov1,
+        ylab = "",
+        xlab = "",
+        cex.lab = 1.5,
+        cex.axis = 1.5,
+        main = "")
+```
+
+```{r}
+# ====================================
+# 5. PRUEBAS NO PARAMÉTRICAS
+# ====================================
+# Prueba de Kruskal-Wallis
+kruskal.test(Longitud_Raiz ~ Dosis, data = DatAov1)
+
+# Post-hoc Dunn con bonferroni
+dunn_result <- dunnTest(Longitud_Raiz ~ Dosis,
+                        data = DatAov1,
+                        method = "bonferroni")  # Otras: "holm", "BH", "none"
+print(dunn_result)
+
+# Comparaciones múltiples con kwAllPairsDunnTest
+posthoc2 <- kwAllPairsDunnTest(Longitud_Raiz ~ Dosis, data = DatAov1, p.adjust.method = "bonferroni")
+print(posthoc2)
+
+# Convertir a tabla
+posthoc2T <- PMCMRTable(posthoc2)
+print(posthoc2T)
+
+# Obtener letras de significancia
+letters1.2 <- cldList(p.value ~ Comparison, data = posthoc2T, threshold = 0.05)
+print(letters1.2)
+
+# Calcular las medianas por grupo
+medians1.2 <- aggregate(Longitud_Raiz ~ Dosis, data = DatAov1, FUN = median)
+
+# Unir letras con medianas
+medians1.2$Letters <- letters1.2$Letter[match(medians1.2$Dosis, letters1.2$Group)]
+print(medians1.2)
+
+# Asignación manual de letras (si fuera necesario)
+medians1.2$Letters <- c("b", "ac", "c", "b")
+print(medians1.2)
+```
