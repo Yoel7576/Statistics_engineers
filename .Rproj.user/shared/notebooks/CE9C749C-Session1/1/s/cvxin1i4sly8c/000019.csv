@@ -1,9 +1,0 @@
-"0","# Librerías adicionales
-library(inti)           # Herramientas complementarias
-"
-"2","Cargando paquete requerido: shiny
-"
-"2","Registered S3 method overwritten by 'htmlwidgets':
-  method           from         
-  print.htmlwidget tools:rstudio
-"
