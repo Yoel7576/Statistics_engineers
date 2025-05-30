@@ -1,0 +1,215 @@
+---
+title: "DCA-ANOVA Three-way"
+author: "Henry W. Santillan Culquimboz"
+format: 
+  html:
+    toc: true
+    toc-location: left
+    number-sections: true
+    embed-resources: true
+    output-file: index
+output-dir: "../"
+---
+
+```{r}
+# ============================================================================
+# 1. CARGA DE LIBRERÍAS
+# ============================================================================
+# Básicas
+library(stats)       # Estadísticas básicas (viene con R base)
+library(car)         # Test de Levene
+library(nortest)     # Pruebas de normalidad adicionales
+library(openxlsx)    # Leer archivos Excel
+
+# Manipulación de datos y modelos
+library(dplyr)       # Manipulación de datos
+library(emmeans)     # Medias marginales estimadas y comparaciones
+library(broom)       # Resultados en formato tidy
+library(agricolae)   # Comparaciones post-hoc
+library(multcomp)    # Comparaciones múltiples
+library(multcompView)
+
+# Visualización
+library(ggplot2)     # Gráficos base
+library(ggpubr)      # Complementos para ggplot2
+library(gridExtra)   # Arreglo de gráficos
+
+# Reportes
+library(knitr)       # Tablas elegantes
+```
+
+```{r}
+# ============================================================================
+# 2. IMPORTACIÓN Y EXPLORACIÓN DE DATOS
+# ============================================================================
+getwd()  # Verificar directorio actual
+
+DatAov3 <- read.xlsx("F:/Estadistica Para Ingenieros/Datos/AnalisisMultivariado.xlsx", 
+                     sheet = "MLM_TresFactores")
+
+str(DatAov3)         # Estructura de los datos
+head(DatAov3)        # Primeras filas
+summary(DatAov3)     # Resumen estadístico
+```
+
+```{r}
+# ============================================================================
+# 3. PREPARACIÓN DE DATOS
+# ============================================================================
+DatAov3 <- DatAov3 |> 
+  mutate(Temperatura   = factor(Temperatura),
+         Microorganismo = factor(Microorganismo),
+         Tipo_medio     = factor(Tipo_medio))
+
+str(DatAov3)  # Confirmar factores
+
+# Ver niveles de cada factor
+levels(DatAov3$Temperatura)
+levels(DatAov3$Microorganismo)
+levels(DatAov3$Tipo_medio)
+
+# Combinaciones del diseño
+table(DatAov3$Temperatura, DatAov3$Microorganismo, DatAov3$Tipo_medio)
+```
+
+```{r}
+# ============================================================================
+# 4. AJUSTE DEL MODELO ANOVA DE TRES VÍAS
+# ============================================================================
+modeloAov3 <- aov(Ritmo_crecimiento ~ Temperatura * Microorganismo * Tipo_medio, 
+                  data = DatAov3)
+
+summary(modeloAov3)
+Anova(modeloAov3, type = "II")  # ANOVA Tipo II (diseños balanceados)
+
+anova_summary <- tidy(modeloAov3)
+print(anova_summary)
+```
+
+```{r}
+# ============================================================================
+# 5. VERIFICACIÓN DE SUPUESTOS
+# ============================================================================
+# Normalidad
+shapiro.test(residuals(modeloAov3))
+ad.test(residuals(modeloAov3))
+qqnorm(residuals(modeloAov3)); qqline(residuals(modeloAov3))
+
+# Homogeneidad de varianzas
+leveneTest(Ritmo_crecimiento ~ Temperatura * Microorganismo * Tipo_medio, data = DatAov3)
+
+# Independencia
+plot(fitted(modeloAov3), residuals(modeloAov3),
+     xlab = "Valores ajustados", ylab = "Residuos",
+     main = "Residuos vs Valores Ajustados")
+abline(h = 0, col = "red")
+```
+
+```{r}
+# ============================================================================
+# 6. PRUEBAS POST HOC PARA EFECTOS PRINCIPALES
+# ============================================================================
+# FUNCION AUXILIAR para limpiar letras
+limpiar_letras <- function(cld_obj) {
+  cld_obj$.group <- gsub(" ", "", cld_obj$.group)  # quitar espacios
+  cld_obj
+}
+
+# Temperatura
+emm_temp <- emmeans(modeloAov3, ~ Temperatura)
+letras_temp <- cld(emm_temp, adjust = "tukey", Letters = letters)
+letras_temp <- limpiar_letras(letras_temp)
+print(letras_temp)
+
+# Microorganismo
+emm_micro <- emmeans(modeloAov3, ~ Microorganismo)
+letras_micro <- cld(emm_micro, adjust = "tukey", Letters = letters)
+letras_micro <- limpiar_letras(letras_micro)
+print(letras_micro)
+
+# Tipo de Medio
+emm_medio <- emmeans(modeloAov3, ~ Tipo_medio)
+letras_medio <- cld(emm_medio, adjust = "tukey", Letters = letters)
+letras_medio <- limpiar_letras(letras_medio)
+print(letras_medio)
+```
+
+```{r}
+# ============================================================================
+# 7. PRUEBAS POST HOC PARA EFECTOS INTERACCIONES
+# ============================================================================
+# Temperatura * Microorganismo
+emm_temp_micro <- emmeans(modeloAov3, ~ Temperatura * Microorganismo)
+letras_temp_micro <- cld(emm_temp_micro, adjust = "tukey", Letters = letters)
+letras_temp_micro <- limpiar_letras(letras_temp_micro)
+print(letras_temp_micro)
+
+# Temperatura * Tipo_medio
+emm_temp_medio <- emmeans(modeloAov3, ~ Temperatura * Tipo_medio)
+letras_temp_medio <- cld(emm_temp_medio, adjust = "tukey", Letters = letters)
+letras_temp_medio <- limpiar_letras(letras_temp_medio)
+print(letras_temp_medio)
+
+# Microorganismo * Tipo_medio
+emm_micro_medio <- emmeans(modeloAov3, ~ Microorganismo * Tipo_medio)
+letras_micro_medio <- cld(emm_micro_medio, adjust = "tukey", Letters = letters)
+letras_micro_medio <- limpiar_letras(letras_micro_medio)
+print(letras_micro_medio)
+
+# Interacción triple
+emm_triple <- emmeans(modeloAov3, ~ Temperatura * Microorganismo * Tipo_medio)
+letras_triple <- cld(emm_triple, adjust = "tukey", Letters = letters)
+letras_triple <- limpiar_letras(letras_triple)
+print(letras_triple)
+```
+
+```{r}
+# ============================================================================
+# 8. GRÁFICOS 
+# ============================================================================
+# Grafico para efectos principales
+ggplot(letras_temp, aes(x = Temperatura, y = emmean)) +
+  geom_col(fill = "skyblue") +
+  geom_text(aes(label = .group), vjust = -0.5) +
+  labs(title = "Medias con letras de significancia (Temperatura)",
+       y = "Media estimada", x = "Temperatura") +
+  theme_minimal()
+
+#Gaficos para interacciones
+interaction.plot(DatAov3$Temperatura, DatAov3$Microorganismo, DatAov3$Ritmo_crecimiento,
+                 type = "b", col = c("red", "blue", "green"), pch = c(16, 17, 18),
+                 main = "Interacción Temperatura * Microorganismo",
+                 xlab = "Temperatura", ylab = "Rendimiento Promedio")
+
+interaction.plot(DatAov3$Temperatura, DatAov3$Tipo_medio, DatAov3$Ritmo_crecimiento,
+                 type = "b", col = c("red", "blue", "green"), pch = c(16, 17, 18),
+                 main = "Interacción Temperatura * Tipo de Medio",
+                 xlab = "Temperatura", ylab = "Rendimiento Promedio")
+
+interaction.plot(DatAov3$Microorganismo, DatAov3$Tipo_medio, DatAov3$Ritmo_crecimiento,
+                 type = "b", col = c("red", "blue", "green"), pch = c(16, 17, 18),
+                 main = "Interacción Microorganismo * Tipo de Medio",
+                 xlab = "Microorganismo", ylab = "Rendimiento Promedio")
+
+# Boxplots
+p1 <- ggplot(DatAov3, aes(x = Temperatura, y = Ritmo_crecimiento, fill = Temperatura)) +
+  geom_boxplot() + theme_minimal() + labs(title = "Rendimiento por Temperatura")
+
+p2 <- ggplot(DatAov3, aes(x = Microorganismo, y = Ritmo_crecimiento, fill = Microorganismo)) +
+  geom_boxplot() + theme_minimal() + labs(title = "Rendimiento por Microorganismo")
+
+p3 <- ggplot(DatAov3, aes(x = Tipo_medio, y = Ritmo_crecimiento, fill = Tipo_medio)) +
+  geom_boxplot() + theme_minimal() + labs(title = "Rendimiento por Tipo de Medio")
+
+grid.arrange(p1, p2, p3, ncol = 3)
+
+# Interacción triple
+ggplot(DatAov3, aes(x = Temperatura, y = Ritmo_crecimiento, 
+                    color = Microorganismo, linetype = Tipo_medio)) +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  stat_summary(fun = mean, geom = "line", aes(group = interaction(Microorganismo, Tipo_medio))) +
+  theme_minimal() +
+  labs(title = "Interacción Triple: Temperatura * Microorganismo * Tipo de Medio",
+       x = "Temperatura", y = "Rendimiento Promedio") +
+  theme(legend.position = "bottom")
+```

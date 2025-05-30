@@ -1,0 +1,154 @@
+---
+title: "MLM Three-way"
+author: "Henry W. Santillan Culquimboz"
+format: 
+  html:
+    toc: true
+    toc-location: left
+    number-sections: true
+    embed-resources: true
+    output-file: index
+output-dir: "../"
+---
+
+```{r}
+# ===========================
+# 1. LIBRERÍAS
+# ===========================
+library(readxl)
+library(lme4)
+library(emmeans)
+library(multcomp)    # para cld()
+library(influence.ME)
+library(ggplot2)
+```
+
+```{r}
+# ===========================
+# 2. IMPORTACIÓN Y EXPLORACIÓN DE DATOS
+# ===========================
+getwd()  # Verificar directorio actual
+
+DatAov3 <- read.xlsx("F:/Estadistica Para Ingenieros/Datos/AnalisisMultivariado.xlsx", 
+                     sheet = "MLM_TresFactores")
+
+str(DatAov3)         # Estructura de los datos
+head(DatAov3)        # Primeras filas
+summary(DatAov3)     # Resumen estadístico
+```
+
+```{r}
+# ===========================
+# 3. PREPARACIÓN DE DATOS
+# ===========================
+DatAov3 <- DatAov3 |> 
+  mutate(ID = factor(ID),
+         Temperatura = factor(Temperatura),
+         Microorganismo = factor(Microorganismo),
+         Tipo_medio = factor(Tipo_medio))
+
+str(DatAov3)  # Confirmar factores
+```
+
+```{r}
+# ===========================
+# 4. MODELO MIXTO
+# ===========================
+modelo_ritmo <- lmer(Ritmo_crecimiento ~ Temperatura * Microorganismo * Tipo_medio + (1|ID), data = DatAov3)
+
+summary(modelo_ritmo)
+```
+
+```{r}
+# ===========================
+# 5. DIAGNÓSTICO DE SUPUESTOS
+# ===========================
+# Residuos
+residuos <- residuals(modelo_ritmo)
+
+hist(residuos, main = "Histograma de los residuos", xlab = "Residuos")
+qqnorm(residuos); qqline(residuos)
+
+predichos <- fitted(modelo_ritmo)
+plot(predichos, residuos,
+     xlab = "Valores predichos",
+     ylab = "Residuos",
+     main = "Residuos vs Valores predichos")
+abline(h = 0, col = "red")
+
+# Efectos aleatorios
+ranef_effects <- ranef(modelo_ritmo)$ID[,1]
+qqnorm(ranef_effects, main = "Q-Q Plot de efectos aleatorios")
+qqline(ranef_effects)
+
+# Influencia por grupo
+infl <- influence(modelo_ritmo, group = "ID")
+plot(cooks.distance(infl), type = "h", main = "Distancia de Cook por ID", ylab = "Cook's Distance")
+```
+
+```{r}
+# ===========================
+# 7. COMPARACIONES MÚLTIPLES (POST-HOC)
+# ===========================
+# Por factor
+emm_temp <- emmeans(modelo_ritmo, ~ Temperatura)
+emm_micro <- emmeans(modelo_ritmo, ~ Microorganismo)
+emm_medio <- emmeans(modelo_ritmo, ~ Tipo_medio)
+
+# Por interacciones dobles
+emm_temp_micro <- emmeans(modelo_ritmo, ~ Temperatura * Microorganismo)
+emm_temp_medio <- emmeans(modelo_ritmo, ~ Temperatura * Tipo_medio)
+emm_micro_medio <- emmeans(modelo_ritmo, ~ Microorganismo * Tipo_medio)
+
+# Triple interacción
+emm_triple <- emmeans(modelo_ritmo, ~ Temperatura * Microorganismo * Tipo_medio)
+
+# Obtener letras de agrupamiento para cada caso
+cld_temp <- cld(emm_temp, alpha = 0.05, Letters = letters, adjust = "tukey")
+cld_micro <- cld(emm_micro, alpha = 0.05, Letters = letters, adjust = "tukey")
+cld_medio <- cld(emm_medio, alpha = 0.05, Letters = letters, adjust = "tukey")
+
+cld_temp_micro <- cld(emm_temp_micro, alpha = 0.05, Letters = letters, adjust = "tukey")
+cld_temp_medio <- cld(emm_temp_medio, alpha = 0.05, Letters = letters, adjust = "tukey")
+cld_micro_medio <- cld(emm_micro_medio, alpha = 0.05, Letters = letters, adjust = "tukey")
+
+cld_triple <- cld(emm_triple, alpha = 0.05, Letters = letters, adjust = "tukey")
+```
+
+```{r}
+# ===========================
+# 8. GRÁFICOS
+# ===========================
+# Gráfico Temperatura
+ggplot(cld_temp, aes(x = Temperatura, y = emmean)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  geom_text(aes(label = .group), vjust = -1) +
+  labs(title = "Medias marginales de Temperatura",
+       y = "Ritmo de crecimiento (emmean)",
+       x = "Temperatura") +
+  theme_minimal()
+
+# Gráfico Temperatura × Microorganismo
+ggplot(cld_temp_micro, aes(x = Microorganismo, y = emmean, color = Temperatura, group = Temperatura)) +
+  geom_point(position = position_dodge(0.5), size = 3) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2,
+                position = position_dodge(0.5)) +
+  geom_text(aes(label = .group), position = position_dodge(0.5), vjust = -1) +
+  labs(title = "Interacción Temperatura x Microorganismo",
+       y = "Ritmo de crecimiento (emmean)",
+       x = "Microorganismo") +
+  theme_minimal()
+
+# Gráfico triple interacción Temperatura × Microorganismo × Tipo_medio (facetas)
+ggplot(cld_triple, aes(x = Microorganismo, y = emmean, color = Temperatura, group = Temperatura)) +
+  geom_point(position = position_dodge(0.7), size = 3) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2,
+                position = position_dodge(0.7)) +
+  geom_text(aes(label = .group), position = position_dodge(0.7), vjust = -1, size = 3) +
+  facet_wrap(~ Tipo_medio) +
+  labs(title = "Interacción triple: Temperatura x Microorganismo x Tipo_medio",
+       y = "Ritmo de crecimiento (emmean)",
+       x = "Microorganismo") +
+  theme_minimal()
+```

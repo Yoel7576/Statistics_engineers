@@ -1,0 +1,74 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+# **Modelos lineales mixtos**
+
+Un modelo mixto, o de efectos mixtos, incorpora efectos fijos y aleatorios, y normalmente se usa cuando se manejan datos que tiene varibilidad dentro de cada grupo y entre grupos. Los efectos fijos son los tratamientos que son de interés para el estudio. Los efectos aleatorios por su parte, están asociados con la variabilidad de cada grupo o sujeto del estudio. Estos últimos se modelan como variables aleatorias de las cuales se asume que siguen una distribución específica.
+
+El objetivo de este cuaderno es observar como funcionaría un modelo mixto para diseño de experimentos, a través de un ejemplo obtenido de una base de datos predeterminada.
+
+```{r}
+library(tidyverse)
+library(broom.mixed)
+library(lme4)
+```
+
+## **Desarrollo ejercicio**
+
+Primeramente ocuparemos una base de datos para el ejercicio
+
+```{r}
+# Ruido para la base de datos
+
+noise<-runif(nrow(CO2),0.02,0.04)
+
+# Base de datos más ruido
+
+uptake2<- CO2$uptake + noise
+
+uptake2
+```
+
+En la primera columna se encuentran las especies o variedades de plantas usadas para el experimento. En la columna “Type” se observa el lugar de experimentación. En la columna “Treatment” se encuentran los dos tipos de tratamiento usado, que son con enfriamento o sin el. La columna “conc” corresponde con la concentración de dióxido de carbono que se le aplicó a las plantas con su respectivo tratamiento, y por último “uptake” son los resultados de cuánto dióxido de carbono se absorbió en realidad.
+
+Con el fin de observar los datos se hace una gráfica
+
+```{r}
+ggplot(CO2, aes(x = conc, y = uptake2, color = Type))+ geom_point(aes(shape = Treatment)) + geom_path(aes(group = Plant, lty = Treatment)) + 
+  theme_bw()
+```
+
+Se observa aparentemente que los tratamientos de Quebec presentaron mayor absorción de CO2. Cabe resaltar que la planta no tendría que ver con los resultados de absorción puesto que se considera que si bien son individuos difentes, al fin y al cabo son la misma especie o variedad de planta y por tanto, no debería haber variación, es decir, es la variable aleatoria.
+
+## **Modelo para variables aleatorias**
+
+Se comparan dos modelos; lineal y aleatorio
+
+```{r}
+# Modelo lineal
+
+MOD1<-lm(uptake2 ~ conc + Type:Treatment, data = CO2)
+
+# Modelo aleatorio
+
+MOD2<-lmer(uptake2 ~ conc + Type:Treatment + (1|Plant), data = CO2)
+```
+
+Para poder observar los modelos utilizamos el paquete broom
+
+```{r}
+# Para el modelo lineal
+
+broom::glance(MOD1)
+```
+
+```{r}
+# Para el modelo lineal
+
+broom.mixed::glance(MOD2)
+```
+
+De aquí se puede concluir, que el tratamiento que mejor resultados tuvo fue el no enfriado en Quebec, aspecto que se tenía previsto desde el análisis descriptivo a partir de la gráfica. Esto es así porque tuvo la mayor pendiente 19,52, indicando de este modo una absorción.de 19.52 en la unida de tiempo estándar para el estudio. Por otro lado, se observa que en el modelo lineal si incluye el tratamiento de enfriado junto con el tipo Mississippi, aunque no le asigna ningún valor, mientras que en el modelo aleatorio lo elimina.

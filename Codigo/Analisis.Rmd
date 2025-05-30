@@ -1,0 +1,605 @@
+---
+title: |
+  <div style='text-align: center;'>
+    <span style='font-size: 60px;'>PCA with Simulated Data</span>
+  </div>
+  
+author: |
+   <div style='text-align: center;'>
+    <span style='font-size: 40px;'><u>Jesus Rascon</u></span>
+
+output: html_document
+css: styles.css
+---
+
+::: {style="font-size: 30px;"}
+# **1. Libreries**
+:::
+
+```{r libraries, message=FALSE}
+library(ggplot2)
+library(openxlsx)
+library(tidyverse)
+library(dplyr)
+library(gtsummary)
+library(plotly)
+library(flextable)
+library(officer)
+library(ggbiplot)
+library(vegan)
+library(extrafont)
+library(gt)
+library(PMCMRplus)
+library(rcompanion)
+library(plotrix)
+
+options(scipen = 999) # Quitar la notación cientifica de los números 
+```
+
+::: {style="font-size: 30px;"}
+# **2. Data import, modification and functions**
+:::
+
+```{r}
+# Importation
+df <- read.xlsx("Data/Data_OK.xlsx", sheet = 1) # Data entrada y salida
+df4 <- read.xlsx("Data/Data_OK.xlsx", sheet = 2) # Eficiencia
+
+# Modification
+df <- df %>% 
+  mutate(Sampling = factor(Sampling, levels = c("M1","M2","M3","M4","M5","M6","M7","M8","M9","M10")),
+         InputOutput = factor(InputOutput),
+         Model = factor(Model))
+
+df1 <- df %>% 
+  filter(Model == "Model1")
+
+df2 <- df %>% 
+  filter(Model == "Model2")
+
+df3 <- df %>% 
+  filter(Model == "Model3")
+
+df4 <- df4 %>% 
+  mutate(Sampling = factor(Sampling, levels = c("M1","M2","M3","M4","M5","M6","M7","M8","M9","M10")),
+         Model = factor(Model, levels = c("Model1", "Model2", "Model3")))
+
+df5 <- df %>% 
+  mutate(Sampling = NULL,
+         InputOutput = NULL,
+         Model = NULL)
+
+# Functions
+min_gts <- function(data, variable, ...) {
+  min(data[[variable]], na.rm = TRUE)
+}
+
+max_gts <- function(data, variable, ...) {
+  max(data[[variable]], na.rm = TRUE)
+}
+
+source("Out/Tests_Nomality_Function_JRB.R")
+```
+
+::: {style="font-size: 30px;"}
+# **3. Descriptive**
+:::
+
+::: {style="font-size: 20px; text-align: justify;"}
+Como estadisiticos descriptivos se han incluido la media, la desviacion estandar, el minimo y el maximo
+:::
+
+::: {style="font-size: 25px;"}
+## **3.1. Caracterizacion general entrada y salida**
+:::
+
+```{r}
+table1 <- 
+  df %>%
+  mutate(Sampling = NULL,
+         Model = NULL) %>%
+  tbl_strata(
+    strata = InputOutput, 
+    ~ .x %>%
+      tbl_summary(
+        label = list(
+          pH ~ "pH",
+          EC ~ "Electrical conductivity (µS/cm)",
+          TS ~ "Total solids (mg/L)",
+          TDS ~ "Total dissolved solids (mg/L)",
+          ALKA ~ "Alkalinity (mg/L)",
+          CHLO ~ "Chlorides (mg/L)",
+          HARD ~ "Hardness (mg/L)",
+          BOD ~ "Biochemical Oxigen Demand (mg/L)",
+          TC ~ "Total Coliforms (NMP/100 mL)",
+          FC ~ "Fecal Coliforms (NMP/100 mL)",
+          Zn ~ "Zinc (mg/L)", 
+          Cd ~ "Cadmium (mg/L)",
+          Cu ~ "Copper (mg/L)",
+          Pb ~ "Lead (mg/L)",
+          Cr ~ "Cromium (mg/L)",
+          B ~ "Boron (mg/L)",
+          Fe ~ "Iron (mg/L)",
+          Ag ~ "Silver (mg/L)",
+          Ni ~ "Nickel (mg/L)"),
+        missing = "no",
+        statistic = all_continuous() ~ "{mean} ± {sd}",
+        digits = all_continuous() ~ 2,
+          type = list(
+          pH ~ "continuous",
+          EC ~ "continuous",
+          TS ~ "continuous",
+          TDS ~ "continuous",
+          ALKA ~ "continuous",
+          CHLO ~ "continuous",
+          HARD ~ "continuous",
+          BOD ~ "continuous",
+          TC ~ "continuous",
+          FC ~ "continuous",
+          Zn ~ "continuous", 
+          Cd ~ "continuous",
+          Cu ~ "continuous",
+          Pb ~ "continuous",
+          Cr ~ "continuous",
+          B ~ "continuous",
+          Fe ~ "continuous",
+          Ag ~ "continuous",
+          Ni ~ "continuous")) %>%
+      modify_footnote(all_stat_cols() ~ NA) %>% 
+      add_stat(fns = all_continuous() ~ min_gts) %>%
+      add_stat(fns = all_continuous() ~ max_gts) %>%
+      modify_fmt_fun(list(add_stat_1 ~ partial(style_number, digits = 2))) %>%
+      modify_fmt_fun(list(add_stat_2 ~ partial(style_number, digits = 2))) %>%
+      modify_header(list(stat_0 ~ "**Mean ± SD**",
+                     add_stat_1 ~ "**Min**",
+                     add_stat_2 ~ "**Max**"))) %>% 
+  as_gt() %>%
+  tab_options(table.font.names = "Times New Roman", table.font.size = 12)
+
+table1
+```
+
+::: {style="font-size: 25px;"}
+## **3.2. Caracterizacion entrada y salida del Modelo 1**
+:::
+
+```{r}
+table2 <- 
+  df1 %>%
+  mutate(Sampling = NULL,
+         Model = NULL) %>%
+  tbl_strata(
+    strata = InputOutput, 
+    ~ .x %>%
+      tbl_summary(
+        label = list(
+          pH ~ "pH",
+          EC ~ "Electrical conductivity (µS/cm)",
+          TS ~ "Total solids (mg/L)",
+          TDS ~ "Total dissolved solids (mg/L)",
+          ALKA ~ "Alkalinity (mg/L)",
+          CHLO ~ "Chlorides (mg/L)",
+          HARD ~ "Hardness (mg/L)",
+          BOD ~ "Biochemical Oxigen Demand (mg/L)",
+          TC ~ "Total Coliforms (NMP/100 mL)",
+          FC ~ "Fecal Coliforms (NMP/100 mL)",
+          Zn ~ "Zinc (mg/L)", 
+          Cd ~ "Cadmium (mg/L)",
+          Cu ~ "Copper (mg/L)",
+          Pb ~ "Lead (mg/L)",
+          Cr ~ "Cromium (mg/L)",
+          B ~ "Boron (mg/L)",
+          Fe ~ "Iron (mg/L)",
+          Ag ~ "Silver (mg/L)",
+          Ni ~ "Nickel (mg/L)"),
+        missing = "no",
+        statistic = all_continuous() ~ "{mean} ± {sd}",
+        digits = all_continuous() ~ 2,
+          type = list(
+          pH ~ "continuous",
+          EC ~ "continuous",
+          TS ~ "continuous",
+          TDS ~ "continuous",
+          ALKA ~ "continuous",
+          CHLO ~ "continuous",
+          HARD ~ "continuous",
+          BOD ~ "continuous",
+          TC ~ "continuous",
+          FC ~ "continuous",
+          Zn ~ "continuous", 
+          Cd ~ "continuous",
+          Cu ~ "continuous",
+          Pb ~ "continuous",
+          Cr ~ "continuous",
+          B ~ "continuous",
+          Fe ~ "continuous",
+          Ag ~ "continuous",
+          Ni ~ "continuous")) %>%
+      modify_footnote(all_stat_cols() ~ NA) %>% 
+      add_stat(fns = all_continuous() ~ min_gts) %>%
+      add_stat(fns = all_continuous() ~ max_gts) %>%
+      modify_fmt_fun(list(add_stat_1 ~ partial(style_number, digits = 2))) %>%
+      modify_fmt_fun(list(add_stat_2 ~ partial(style_number, digits = 2))) %>%
+      modify_header(list(stat_0 ~ "**Mean ± SD**",
+                     add_stat_1 ~ "**Min**",
+                     add_stat_2 ~ "**Max**"))) %>% 
+  as_gt() %>%
+  tab_options(table.font.names = "Times New Roman", table.font.size = 12)
+
+table2
+```
+
+::: {style="font-size: 25px;"}
+## **3.3. Caracterizacion entrada y salida del Modelo 2**
+:::
+
+```{r}
+table3 <- 
+  df2 %>%
+  mutate(Sampling = NULL,
+         Model = NULL) %>%
+  tbl_strata(
+    strata = InputOutput, 
+    ~ .x %>%
+      tbl_summary(
+        label = list(
+          pH ~ "pH",
+          EC ~ "Electrical conductivity (µS/cm)",
+          TS ~ "Total solids (mg/L)",
+          TDS ~ "Total dissolved solids (mg/L)",
+          ALKA ~ "Alkalinity (mg/L)",
+          CHLO ~ "Chlorides (mg/L)",
+          HARD ~ "Hardness (mg/L)",
+          BOD ~ "Biochemical Oxigen Demand (mg/L)",
+          TC ~ "Total Coliforms (NMP/100 mL)",
+          FC ~ "Fecal Coliforms (NMP/100 mL)",
+          Zn ~ "Zinc (mg/L)", 
+          Cd ~ "Cadmium (mg/L)",
+          Cu ~ "Copper (mg/L)",
+          Pb ~ "Lead (mg/L)",
+          Cr ~ "Cromium (mg/L)",
+          B ~ "Boron (mg/L)",
+          Fe ~ "Iron (mg/L)",
+          Ag ~ "Silver (mg/L)",
+          Ni ~ "Nickel (mg/L)"),
+        missing = "no",
+        statistic = all_continuous() ~ "{mean} ± {sd}",
+        digits = all_continuous() ~ 2,
+          type = list(
+          pH ~ "continuous",
+          EC ~ "continuous",
+          TS ~ "continuous",
+          TDS ~ "continuous",
+          ALKA ~ "continuous",
+          CHLO ~ "continuous",
+          HARD ~ "continuous",
+          BOD ~ "continuous",
+          TC ~ "continuous",
+          FC ~ "continuous",
+          Zn ~ "continuous", 
+          Cd ~ "continuous",
+          Cu ~ "continuous",
+          Pb ~ "continuous",
+          Cr ~ "continuous",
+          B ~ "continuous",
+          Fe ~ "continuous",
+          Ag ~ "continuous",
+          Ni ~ "continuous")) %>%
+      modify_footnote(all_stat_cols() ~ NA) %>% 
+      add_stat(fns = all_continuous() ~ min_gts) %>%
+      add_stat(fns = all_continuous() ~ max_gts) %>%
+      modify_fmt_fun(list(add_stat_1 ~ partial(style_number, digits = 2))) %>%
+      modify_fmt_fun(list(add_stat_2 ~ partial(style_number, digits = 2))) %>%
+      modify_header(list(stat_0 ~ "**Mean ± SD**",
+                     add_stat_1 ~ "**Min**",
+                     add_stat_2 ~ "**Max**"))) %>% 
+  as_gt() %>%
+  tab_options(table.font.names = "Times New Roman", table.font.size = 12)
+
+table3
+```
+
+::: {style="font-size: 25px;"}
+## **3.4. Caracterizacion entrada y salida del Modelo 3**
+:::
+
+```{r}
+table4 <- 
+  df3 %>%
+  mutate(Sampling = NULL,
+         Model = NULL) %>%
+  tbl_strata(
+    strata = InputOutput, 
+    ~ .x %>%
+      tbl_summary(
+        label = list(
+          pH ~ "pH",
+          EC ~ "Electrical conductivity (µS/cm)",
+          TS ~ "Total solids (mg/L)",
+          TDS ~ "Total dissolved solids (mg/L)",
+          ALKA ~ "Alkalinity (mg/L)",
+          CHLO ~ "Chlorides (mg/L)",
+          HARD ~ "Hardness (mg/L)",
+          BOD ~ "Biochemical Oxigen Demand (mg/L)",
+          TC ~ "Total Coliforms (NMP/100 mL)",
+          FC ~ "Fecal Coliforms (NMP/100 mL)",
+          Zn ~ "Zinc (mg/L)", 
+          Cd ~ "Cadmium (mg/L)",
+          Cu ~ "Copper (mg/L)",
+          Pb ~ "Lead (mg/L)",
+          Cr ~ "Cromium (mg/L)",
+          B ~ "Boron (mg/L)",
+          Fe ~ "Iron (mg/L)",
+          Ag ~ "Silver (mg/L)",
+          Ni ~ "Nickel (mg/L)"),
+        missing = "no",
+        statistic = all_continuous() ~ "{mean} ± {sd}",
+        digits = all_continuous() ~ 2,
+          type = list(
+          pH ~ "continuous",
+          EC ~ "continuous",
+          TS ~ "continuous",
+          TDS ~ "continuous",
+          ALKA ~ "continuous",
+          CHLO ~ "continuous",
+          HARD ~ "continuous",
+          BOD ~ "continuous",
+          TC ~ "continuous",
+          FC ~ "continuous",
+          Zn ~ "continuous", 
+          Cd ~ "continuous",
+          Cu ~ "continuous",
+          Pb ~ "continuous",
+          Cr ~ "continuous",
+          B ~ "continuous",
+          Fe ~ "continuous",
+          Ag ~ "continuous",
+          Ni ~ "continuous")) %>%
+      modify_footnote(all_stat_cols() ~ NA) %>% 
+      add_stat(fns = all_continuous() ~ min_gts) %>%
+      add_stat(fns = all_continuous() ~ max_gts) %>%
+      modify_fmt_fun(list(add_stat_1 ~ partial(style_number, digits = 2))) %>%
+      modify_fmt_fun(list(add_stat_2 ~ partial(style_number, digits = 2))) %>%
+      modify_header(list(stat_0 ~ "**Mean ± SD**",
+                     add_stat_1 ~ "**Min**",
+                     add_stat_2 ~ "**Max**"))) %>% 
+  as_gt() %>%
+  tab_options(table.font.names = "Times New Roman", table.font.size = 12)
+
+table4
+```
+
+::: {style="font-size: 30px;"}
+# **4. Principal Components Analysis**
+:::
+
+::: {style="font-size: 20px; text-align: justify;"}
+El ACP se usa para ver:
+
+1.  Cuales son los parametros mas importantes en todo el estudio.
+
+2.  Cual es el comportamiento de los parametros, como se correlacionan de forma multivariante.
+
+3.  Cual es el filtro mas idoneo. Si hay diferencias multivariantes entre los filtros. Tambien cuales son los parametros mas influyentes en cada filtro
+:::
+
+::: {style="font-size: 25px;"}
+## **4.1. Calcular el ACP**
+:::
+
+::: {style="font-size: 20px; text-align: justify;"}
+El ACP se hace a partir de una matriz de correlaciones dado que las unidades de los parametros tienen distintas unidades de medida, son adimensionales.
+:::
+
+```{r}
+ACP <- prcomp(df5, scale. = T)
+
+head(ACP$sdev, 5)
+head(ACP$rotation[,1:5])
+head(ACP$center, 5)
+head(ACP$scale, 5)
+head(ACP$x[,1:5])
+```
+
+::: {style="font-size: 25px;"}
+## **4.2. Numero de componentes principales a retener**
+:::
+
+::: {style="font-size: 20px; text-align: justify;"}
+Para seleccionar el numero de componentes principales (PC) con el que trabajar, se usara el criterio de porcentaje de varianza acumulada.
+
+Con el porcentaje de varianza acumulada, se establece un umbral de varianza acumulada deseado y se retenien las suficientes PC para alcanzar ese umbral. En este caso vamos a considerar un rango del 70% al 90% como un umbral para retener las PC.
+
+Hacemos el "summary" del ACP para ver la desviacion estandar, la varianza de cada componente y la varianza acumulada.
+:::
+
+```{r}
+Varianza <- summary(ACP)
+Varianza$importance[,1:6]
+```
+
+::: {style="font-size: 20px; text-align: justify;"}
+Se selecionan las cuatro primeras PC al acumular el 78.26% de la varianza
+:::
+
+::: {style="font-size: 25px;"}
+## **4.3. Parametros mas importantes del estudio**
+:::
+
+::: {style="font-size: 20px; text-align: justify;"}
+Al realizar el analisis, los componentes principales (PC) capturan la informacion de los parametros y proporcionan una comprension de cuales son los parametros mas importantes en el estudio. Se suele usar una tabla de correlaciones entre los parametros y las componentes seleccionadas para ver los mas importantes.
+
+Se hace una correlacion mediante una multiplicacion matricial entre la matriz con los vectores de carga de los parametros y los PC, y la matriz diagonal construida a partir de la desviacion estandar de los componentes principales. Tras ello, los parametros mas importantes del estudio son los que tengan una correlacion muy fuerte, osea mayor a ±0.70 (Akoglu, 2018).
+:::
+
+```{r}
+cor <- ACP$rotation %*% diag(ACP$sdev) # "%*%" Se utiliza para realizar la multiplicacion de matrices
+cor <- round(cor,2) 
+cor <- cor[,1:4]
+cor
+```
+
+::: {style="font-size: 20px; text-align: justify;"}
+Para ver mejor dichas relaciones, se hace una tabla ACP
+:::
+
+```{r}
+Tabla_ACP <- rbind(Varianza$importance[, 1:4],  c(NA, NA), cor)
+Tabla_ACP <- as.data.frame(apply(Tabla_ACP, 2, function(x) round(x, 2)))
+Filas <- as.data.frame(row.names(Tabla_ACP))
+Tabla_ACP <- cbind(Filas, Tabla_ACP)
+colnames(Tabla_ACP)[1] <- "Principal components"
+Tabla_ACP %>%   
+  flextable() %>% 
+  bold(~ PC1 > 0.69, 2) %>% 
+  bold(~ PC1 < -0.69, 2) %>%
+  bold(~ PC2 > 0.69, 3) %>% 
+  bold(~ PC2 < -0.69, 3) %>%
+  bold(~ PC3 > 0.69, 4) %>% 
+  bold(~ PC3 < -0.69, 4) %>%
+  bold(~ PC4 > 0.69, 5) %>% 
+  bold(~ PC4 < -0.69, 5) %>%
+  bold(i = 1:4, bold = F) %>% 
+  bold(part = "header") %>% 
+  font(fontname = "Times New Roman", part = "all") %>% 
+  fontsize(size = 12, part = "all")
+```
+
+::: {style="font-size: 20px; text-align: justify;"}
+Observando la tabla PCA, hay un total de 12 parametros de gran importancia para el estudio.
+:::
+
+::: {style="font-size: 25px;"}
+## **4.4. Comportamiento de los parametros**
+:::
+
+::: {style="font-size: 20px; text-align: justify;"}
+El PCA tambien permite evaluar como se correlacionan los parametros entre si. Un biplot puede proporcionar informacion visual sobre como los parametros se relacionan entre si. Cuando los vectores estan en direcciones opuestas (180 grados), hay una correlacion negativa fuerte entre los parametros. Sin embargo, si los vectores estan en la misma direccion o estan muy cercanos, hay una correlacion positiva fuerte entre los parametros
+
+Hacemos un grafico Biplot inclyendo el circulo de correlacion, con las dos primeras PC, las cuales retienen un 49.79% de la varianza de los datos. Con este primer grafico, podemos comprobar como se relaccionan entre si los parametros evaluados en las aguas.
+:::
+
+```{r}
+BIPLOT1 <- ggbiplot(ACP, 
+                    obs.scale = 1, 
+                    var.scale = 1, 
+                    ellipse = FALSE, 
+                    circle = TRUE,
+                    varname.size = 4) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        axis.text = element_text(size = 12, color = "black"),
+        text = element_text(size = 16, color = "black")) +
+  geom_vline(xintercept = 0, 
+             linetype = "dashed") +
+  geom_hline(yintercept = 0,
+             linetype = "dashed") +
+  geom_point(color = "black")+
+  theme_bw()
+
+# Cambiar color flchas y color y tipo de letra
+seg1 <- which(sapply(BIPLOT1$layers, function(x) class(x$geom)[1] == 'GeomSegment'))
+txt1 <- which(sapply(BIPLOT1$layers, function(x) class(x$geom)[1] == 'GeomText'))
+BIPLOT1$layers[[seg1]]$aes_params$colour <- 'black'
+BIPLOT1$layers[[seg1]]$aes_params$size <- 0.5
+BIPLOT1$layers[[txt1]] <- geom_text(aes(x = xvar, y = yvar, label = varname,
+                                       angle = angle, hjust = hjust), 
+                                   data = BIPLOT1$layers[[txt1]]$data,
+                                   family = "Times New Roman", 
+                                   size = 4,
+                                   color = "black")
+
+BIPLOT1
+```
+
+::: {style="font-size: 25px;"}
+## **4.5. Filtro mas idoneo**
+:::
+
+::: {style="font-size: 20px; text-align: justify;"}
+El biplot puede proporcionar informacion visual sobre como los parametros se agrupan en relacion con las observaciones (en este caso, las modelos). En general, si un parametro esta mas cerca de una elipse en el biplot, es probable que tenga una mayor influencia en ese modelo. La cercania espacial entre el vector del parametro y la elipse sugiere una mayor asociacion o correlacion entre ese parametro y el modelo representado por la elipse. Por ultimno nos permite ver si hay diferencias entre las modelos.
+
+Por otro lado, se realiza un Permanova para confirmar que los grupos conformados son significativamente disimilares
+:::
+
+```{r}
+# ACP
+BIPLOT2 <- ggbiplot(ACP, 
+                    obs.scale = 1, 
+                    var.scale = 1, 
+                    groups = df$Model,
+                    ellipse = TRUE,
+                    varname.size = 4) +
+  scale_color_manual(name = '', 
+                     values = c("red",
+                                "blue",
+                                "green"))+
+  theme_classic()+
+  theme(axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        axis.text = element_text(size = 12, color = "black"),
+        text = element_text(family = "Times New Roman", size = 16, color = "black"),
+        legend.justification=c(1,1),
+        legend.position=c(1,1),
+        legend.title=element_blank())
+
+# Cambiar color flchas y color y tipo de letra
+seg2 <- which(sapply(BIPLOT2$layers, function(x) class(x$geom)[1] == 'GeomSegment'))
+txt2 <- which(sapply(BIPLOT2$layers, function(x) class(x$geom)[1] == 'GeomText'))
+BIPLOT2$layers[[seg2]]$aes_params$colour <- 'black'
+BIPLOT2$layers[[seg2]]$aes_params$size <- 0.5
+BIPLOT2$layers[[txt2]] <- geom_text(aes(x = xvar, y = yvar, label = varname,
+                                       angle = angle, hjust = hjust), 
+                                   data = BIPLOT2$layers[[txt2]]$data,
+                                   family = "Times New Roman", 
+                                   size = 4,
+                                   color = "black")
+
+BIPLOT2
+```
+
+::: {style="font-size: 25px;"}
+## **4.6. Diferencias multivariantes entre entrada y salida**
+:::
+
+::: {style="font-size: 20px; text-align: justify;"}
+El biplot puede proporcionar informacion visual sobre como los parametros se agrupan en relacion con las observaciones (en este caso, la entrad o salida). En general, si un parametro esta mas cerca de una elipse en el biplot, es probable que tenga una mayor influencia en esa parte del filtro. La cercania espacial entre el vector del parametro y la elipse sugiere una mayor asociacion o correlacion entre ese parametro y el modelo representado por la elipse. Por ultimno nos permite ver si hay diferencias entre las partes del filtro.
+:::
+
+```{r}
+# ACP
+BIPLOT3 <- ggbiplot(ACP, 
+                    obs.scale = 1, 
+                    var.scale = 1, 
+                    groups = df$InputOutput,
+                    ellipse = TRUE,
+                    varname.size = 4) +
+  scale_color_manual(name = '', 
+                     values = c("red",
+                                "blue"))+
+  theme_classic()+
+  theme(axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        axis.text = element_text(size = 12, color = "black"),
+        text = element_text(family = "Times New Roman", size = 16, color = "black"),
+        legend.justification=c(1,1),
+        legend.position=c(1,1),
+        legend.title=element_blank())
+
+# Cambiar color flchas y color y tipo de letra
+seg2 <- which(sapply(BIPLOT2$layers, function(x) class(x$geom)[1] == 'GeomSegment'))
+txt2 <- which(sapply(BIPLOT2$layers, function(x) class(x$geom)[1] == 'GeomText'))
+BIPLOT3$layers[[seg2]]$aes_params$colour <- 'black'
+BIPLOT3$layers[[seg2]]$aes_params$size <- 0.5
+BIPLOT3$layers[[txt2]] <- geom_text(aes(x = xvar, y = yvar, label = varname,
+                                       angle = angle, hjust = hjust), 
+                                   data = BIPLOT3$layers[[txt2]]$data,
+                                   family = "Times New Roman", 
+                                   size = 4,
+                                   color = "black")
+
+BIPLOT3
+```
